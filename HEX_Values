@@ -1,0 +1,244 @@
+# Isolated HEX Values for each setting.
+
+GNSS = OFF	0x79A3 = 00
+GNSS = ON	0x79A3 = 80
+
+GNSS APRS = OFF	0x79A0 = 08
+GNSS APRS = ON	0x79A0 = 48
+
+
+/\/\/\/\/\/\/REVISIT when GPS available/\/\/\/\/\/\/
+#Enabling these both changed the same offset, but also resulted in the same values. I suspect it may be because I didn't have a GPS lock. Need to revisit these.
+GNSS Share Position = OFF	0x79A3 = 80
+GNSS Share Position = ON	0x79A3 = 90
+
+GNSS Request Position = OFF	0x79A3 = 80
+GNSS Request Position = ON	0x79A3 = 90
+/\/\/\/\/\/\//\/\/\/\/\/\/\/\/\/\/\/\//\/\/\/\/\/\/
+
+
+GNSS Time Zone ranges from -12 to +12 in increments of 1.
+GNSS Time Zone = -12	0x7998 = 00
+	...
+GNSS Time Zone = 0	0x7998 = 0C
+	...
+GNSS Time Zone = 12	0x7998 = 18
+
+NOAA WX Alert = OFF	0x79A5 = 00, 0x799E = 00
+NOAA WX Alert = ON	0x79A5 = 08, 0x799E = 09
+
+NOAA Weather = OFF	0x79A6 = 20
+NOAA Weather = WX1	0x79A6 = 30, 0x799E = 00
+NOAA Weather = WX2	0x79A6 = 30, 0x799E = 01
+NOAA Weather = WX3	0x79A6 = 30, 0x799E = 02
+NOAA Weather = WX4	0x79A6 = 30, 0x799E = 03
+NOAA Weather = WX5	0x79A6 = 30, 0x799E = 04
+NOAA Weather = WX6	0x79A6 = 30, 0x799E = 05
+NOAA Weather = WX7	0x79A6 = 30, 0x799E = 06
+NOAA Weather = WX8	0x79A6 = 30, 0x799E = 07
+NOAA Weather = WX9	0x79A6 = 30, 0x799E = 08
+NOAA Weather = WX10	0x79A6 = 30, 0x799E = 09
+
+VOX Level = OFF	0x79A0 = 08, 0x798E=01
+VOX Level = Level 1	0x79A0 = 88, 0x798E=01
+VOX Level = Level 5	0x79A0 = 88, 0x798E=05
+VOX Level = Level 9	0x79A0 = 88, 0x798E=09
+
+VOX Delay 1.0s ... 10.0s in 0.5s increments.
+VOX Delay = 1.0s	0x798E-0x798F = 01 0A
+VOX Delay = 10.0s	0x798E-0x798F = 05 64
+
+TOT = OFF	0x798E = 05, 0x7995 = 00
+TOT = 15s	0x798E = 05, 0x7995 = 01
+TOT = 75s	0x798E = 05, 0x7995 = 05
+TOT = 120s	0x798E = 01, 0x7995 = 08
+TOT = 210s	0x798E = 05, 0x7995 = 0E
+
+
+TOA = OFF	0x7996 = 00
+TOA = 1s	0x7996 = 01
+TOA = 2s	0x7996 = 02
+TOA = 3s	0x7996 = 03
+TOA = 4s	0x7996 = 04
+TOA = 5s	0x7996 = 05
+TOA = 6s	0x7996 = 06
+TOA = 7s	0x7996 = 07
+TOA = 8s	0x7996 = 08
+TOA = 9s	0x7996 = 09
+TOA = 10s	0x7996 = 0A
+
+
+ROGER = OFF	0x79A2 = 80
+ROGER = ROGER1	0x79A2 = A0
+ROGER = ROGER2	0x79A2 = C0
+ROGER = ROGER3	0x79A2 = E0
+
+Voice = OFF	0x79A0 = 00
+Voice = Chinese	0x79A0 = 04
+Voice = English	0x79A0 = 08
+
+Language = English	0x79A5 = 00
+Language = Chinese	0x79A5 = 04
+
+Power On Display = PICTURE	0x79A5 = 00
+Power On Display = MESSAGE	0x79A5 = 01
+Power On Display = VOLTAGE	0x79A5 = 02
+
+DIR = STAN	0x79A6 = 20
+DIR = FAIL	0x79A6 = 28
+
+BEEP = ON	0x79A2 = 80
+BEEP = OFF	0x79A2 = 00
+
+Dual Watch = Double Wait	0x798B = 00
+Dual Watch = OFF	0x798B = 01
+Dual Watch = Signal Wait	0x798B = 02
+
+
+Autolock = OFF	0x79A1 = 00
+Autolock = ON	0x79A1 = 40
+
+Sidetone DTMF = ON	0x8206 = 01
+Sidetone DTMF = OFF	0x8206 = 00
+Sidetone 2Tone = ON	0x8404 = 01
+Sidetone 2Tone = OFF	0x8404 = 00	
+Sidetone 5Tone = ON 0x9450 = 01
+Sidetone 5Tone = OFF 0x9450 = 00
+Sidetone BDC1200 = ON	0x9C88 = 01
+Sidetone BDC1200 = OFF	0x9C88 = 00
+
+PTT-ID = OFF	0x0091 = 00
+PTT-ID = BOT	0x0091 = 10
+PTT-ID = EOT	0x0091 = 20
+PTT-ID = BOTH	0x0091 = 30
+
+PTT-DLY is in 10ms increments from 10ms to 2500ms.
+PTT-DLY = 10ms	0x8204 = 00
+PTT-DLY = 200ms	0x8204 = 14
+PTT-DLY = 2500ms	0x8204 = F9
+
+ALERT = 1000Hz	0x799A = 00
+ALERT = 1450Hz	0x799A = 01
+ALERT = 1750Hz	0x799A = 02
+ALERT = 2100Hz	0x799A = 03
+
+TAIL = OFF	0x79A6 = 00
+TAIL = 55	0x79A6 = 20
+TAIL = 120	0x79A6 = 40
+TAIL = 180	0x79A6 = 60
+TAIL = 240	0x79A6 = 80
+
+
+Radio Interrupt = OFF	0x79A3 = 20
+Radio Interrupt = ON	0x79A3 = 24
+
+APO Settings: 0x79A6 may not be relevant. From Factory baseline OFF to 30s it went changed from 20 to 60. Changing from 30s to OFF did not seem to change this value back to 20.
+APO = OFF	0x7994 = 00, 0x79A6 = 20
+APO = 30min	0x7994 = 01, 0x79A6 = 60
+APO = 60min	0x7994 = 02, 0x79A6 = 60
+APO = 120min	0x7994 = 03, 0x79A6 = 60
+APO = 240min	0x7994 = 04, 0x79A6 = 60
+APO = 480min	0x7994 = 05, 0x79A6 = 60
+
+
+=============
+DTMF ID range is 0x8210-0x8212
+5Tone ID range is 0x9443-0x9446
+BIIS ID range is 0x9C80-0x9C81
+Radio Name range is 0x0000-0x000F
+
+Password = Disabled	0x799F = 0
+Password = Enabled	0x799F = 1
+Password range is 0x79C0-0x79C7
+=============
+
+
+Press_SK1 = None	0x79B0 = 00
+Press_SK1 = SCAN	0x79B0 = 01
+Press_SK1 = MONITOR	0x79B0 = 02
+Press_SK1 = FM Radio	0x79B0 = 04
+Press_SK1 = SOS	0x79B0 = 05
+Press_SK1 = GNSS System	0x79B0 = 06
+Press_SK1 = One Touch Search	0x79B0 = 07
+Press_SK1 = 1750Hz	0x79B0 = 09
+Press_SK1 = Falling Alarm	0x79B0 = 0A
+Press_SK1 = One Touch Call	0x79B0 = 0B
+Press_SK1 = Zone	0x79B0 = 0C
+Press_SK1 = Battery Display	0x79B0 = 0D
+Press_SK1 = Power	0x79B0 = 0E
+Press_SK1 = Vox	0x79B0 = 0F
+
+
+LongPress_SK1 = None	0x79B2 = 00
+LongPress_SK1 = SCAN	0x79B2 = 01
+LongPress_SK1 = MONITOR	0x79B2 = 02
+LongPress_SK1 = FM Radio	0x79B2 = 04
+LongPress_SK1 = SOS	0x79B2 = 05
+LongPress_SK1 = GNSS System	0x79B2 = 06
+LongPress_SK1 = One Touch Search	0x79B2 = 07
+LongPress_SK1 = 1750Hz	0x79B2 = 09
+LongPress_SK1 = Falling Alarm	0x79B2 = 0A
+LongPress_SK1 = One Touch Call	0x79B2 = 0B
+LongPress_SK1 = Zone	0x79B2 = 0C
+LongPress_SK1 = Battery Display	0x79B2 = 0D
+LongPress_SK1 = Power	0x79B2 = 0E
+LongPress_SK1 = Vox	0x79B2 = 0F
+
+
+Press_SK2 = None	0x79B1 = 00
+Press_SK2 = SCAN	0x79B1 = 01
+Press_SK2 = MONITOR	0x79B1 = 02
+Press_SK2 = FM Radio	0x79B1 = 04
+Press_SK2 = SOS	0x79B1 = 05
+Press_SK2 = GNSS System	0x79B1 = 06
+Press_SK2 = One Touch Search	0x79B1 = 07
+Press_SK2 = 1750Hz	0x79B1 = 09
+Press_SK2 = Falling Alarm	0x79B1 = 0A
+Press_SK2 = One Touch Call	0x79B1 = 0B
+Press_SK2 = Zone	0x79B1 = 0C
+Press_SK2 = Battery Display	0x79B1 = 0D
+Press_SK2 = Power	0x79B1 = 0E
+Press_SK2 = Vox	0x79B1 = 0F
+
+
+LongPress SK2 = None	0x79B3 = 00
+LongPress SK2 = SCAN	0x79B3 = 01
+LongPress SK2 = MONITOR	0x79B3 = 02
+LongPress SK2 = FM Radio	0x79B3 = 04
+LongPress SK2 = SOS	0x79B3 = 05
+LongPress SK2 = GNSS System	0x79B3 = 06
+LongPress SK2 = One Touch Search	0x79B3 = 07
+LongPress SK2 = 1750Hz	0x79B3 = 09
+LongPress SK2 = Falling Alarm	0x79B3 = 0A
+LongPress SK2 = One Touch Call	0x79B3 = 0B
+LongPress SK2 = Zone	0x79B3 = 0C
+LongPress SK2 = Battery Display	0x79B3 = 0D
+LongPress SK2 = Power	0x79B3 = 0E
+LongPress SK2 = Vox	0x79B3 = 0F
+
+
+
+=============
+Contacts:
+Contact Code is max 255.
+Contact name is max 14 chars.
+0xA010 is contact number 01.
+0xA012 starts the name of the contact 01.
+0xA140 is contact number 20.
+0xA142-0xA149 is the name of contact 20.
+0xA280 is contact number 40, the last contact.
+0xA282 is start of Contact 40 name.
+
+=============
+Zone Selected
+Zone = 1	0x7986 = 0
+Zone = 2	0x7986 = 1
+
+Add Zone2 and Zone2 Name  0x0C80-0x0CAF = 00 25 49 14 00 25 49 14 00 00 00 00 00 00 00 00 A0 00 00 00 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00, 0x7A28 = FE, 0x7B28 = 01, 0x7B2A-0x7B2B = 00 40, 0x7BB0-0x7BBF is max allowable user input range
+
+Zones:
+There can be up to 10 Zones.
+Zone 1 default is 21 Valid Channels, and 64 Max Channels.
+Zone 01 Name starts at 0x7B18
+Zone 02 Name starts at 0x7BB0
+Zone 10 Name starts at 0x8070
