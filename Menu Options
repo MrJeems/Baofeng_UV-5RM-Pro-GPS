@@ -1,0 +1,377 @@
+
+==Top Menu==
+Zone
+Scan
+Radio Setting
+Program Channel
+Radio Info
+GNSS
+NOAA Weather
+
+
+=SUBMENU ITEMS=
+==Radio Setting==
+Squelch
+-OFF
+-Level 1
+-Level 2
+-Level 3
+-Level 4
+-Level 5
+-Level 6
+-Level 7
+-Level 8
+-Level 9
+
+Power Save
+-OFF
+-1:1
+-1:2
+-1:4
+
+VOX Level
+-OFF
+-Level 1
+-Level 2
+-Level 3
+-Level 4
+-Level 5
+-Level 6
+-Level 7
+-Level 8
+-Level 9
+
+VOX Delay
+- 1.0s ... 10.0s in 0.5s increments
+
+TOT
+-OFF
+-15s
+-30s
+-45s
+-60s
+-75s
+-90s
+-105s
+-120s
+-135s
+-150s
+-165s
+-180s
+-195s
+-210s
+
+TOA
+-OFF
+-1s
+-2s
+-3s
+-4s
+-5s
+-6s
+-7s
+-8s
+-9s
+-10s
+
+VOICE
+-OFF
+-Chinese
+-English
+
+Language
+-English
+-Chinese
+
+Beep
+-OFF
+-ON
+
+ROGER
+-OFF
+-ROGER 1
+-ROGER 2
+-ROGER 3
+
+Backlight
+-Always On
+-5s ... 30s in 1s increments
+
+Brightness
+-1
+-2
+-3
+-4
+-5
+
+Power on Display
+-PICTURE
+-MESSAGE
+-VOLTAGE
+
+Power on MSG
+-(user input)
+
+DIR
+-STAN
+-FAIL
+
+MDF-A
+-Freq
+-Name
+-CH
+-Freq+Name
+
+MDF-B
+-Freq
+-Name
+-CH
+-Freq+Name
+
+Dual Watch
+-OFF
+-Double Wait
+-Signal Wait
+
+AutoLock
+-OFF
+-ON
+
+Alarm Mode
+
+ID Verification
+-Contact 1
+
+SideTone
+-DTMF
+-2Tone
+-5Tone
+-BDC1200
+
+PTT-ID
+-OFF
+-BOT
+-EOT
+-BOTH
+
+PTT-DLY
+-10ms - 2500ms - 10ms increments
+
+ALERT
+-1000Hz
+-1450Hz
+-1750Hz
+-2100Hz
+
+TAIL
+-OFF
+-55Hz
+-120
+-180
+-240
+
+Press SK1
+-None
+-SCAN
+-MONITOR
+-FM Radio
+-SOS
+-GNSS System
+-One Touch Search
+-1750Hz
+-Falling Alarm
+-One Touch Call
+-Zone
+-Battery Display
+-Power
+-Vox
+
+LongPress SK1
+-None
+-SCAN
+-MONITOR
+-FM Radio
+-SOS
+-GNSS System
+-One Touch Search
+-1750Hz
+-Falling Alarm
+-One Touch Call
+-Zone
+-Battery Display
+-Power
+-Vox
+
+Press SK2
+-None
+-SCAN
+-MONITOR
+-FM Radio
+-SOS
+-GNSS System
+-One Touch Search
+-1750Hz
+-Falling Alarm
+-One Touch Call
+-Zone
+-Battery Display
+-Power
+-Vox
+
+LongPress SK2
+-None
+-SCAN
+-MONITOR
+-FM Radio
+-SOS
+-GNSS System
+-One Touch Search
+-1750Hz
+-Falling Alarm
+-One Touch Call
+-Zone
+-Battery Display
+-Power
+-Vox
+
+FM Radio
+-Radio On/Off
+--OFF
+--ON
+Radio Interrupt
+--OFF
+--ON
+
+APO
+-OFF
+-30min
+-60min
+-120min
+-240min
+-480min
+
+Password
+-User Input
+
+Reset
+-VFO
+-ALL
+
+
+
+
+==Program Channel==
+RX Frequency
+-Manual Entry
+
+TX Frequency
+-Manual Entry
+
+Trans Power
+Bandwidth
+-Narrow
+-Wide
+
+RX CTCSS
+-OFF
+-254.1Hz ... 63.0Hz
+
+RX DCS
+-OFF
+-754N ... 017N
+
+TX CTCSS
+-OFF
+-254.1Hz ... 63.0Hz
+
+TX DCS
+-OFF
+-754N ... 017N
+
+Signaling
+-NONE
+-DTMF
+-2Tone
+-5Tone
+-MDC
+-BDC1200
+
+SP-Mute
+-OFF
+-QT
+-Optional Signaling
+-QT+DTMF
+
+Busy Lockout
+-OFF
+-ON
+
+Step
+-2.5K
+-5K
+-6.25K
+-10K
+-12.5K
+-20K
+-25K
+-30K
+-50K
+-100K
+
+Offset
+-Manual Entry
+
+Direction
+-None
+-Plus
+-Minus
+
+Skip Freq
+-Off
+-Normal
+-Strict
+
+
+==Radio Info==
+Radio ID
+-DTMF ID: 123
+-5Tone ID: 12345
+-BIIS ID: 1234
+Radio Name: 
+
+==GNSS==
+GNSS On/Off
+-OFF
+-ON
+GPS Info
+-my position
+-Share Position
+--OFF
+--ON
+-Request Position
+--OFF
+--ON
+-APRS
+--OFF
+--ON
+Time Zone
+- -12 ... 12		*In increments of 1
+
+
+
+==NOAA Weather==
+Weather On/Off
+-OFF
+-WX1
+-WX2
+-WX3
+-WX4
+-WX5
+-WX6
+-WX7
+-WX8
+-WX9
+-WX10
+Weather Alert
+-OFF
+-ON
