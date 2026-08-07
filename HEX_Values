@@ -1,5 +1,17 @@
 # Isolated HEX Values for each setting.
 
+
+Scan Mode = TO	0x8180 = 00
+Scan Mode = CO	0x8180 = 01
+Scan Mode = SE	0x8180 = 02
+
+
+*Default mem value is 0x818B = 00. Selecting one of these values changes it.
+Scan Memory = ENCODER	0x818B = 00
+Scan Memory = DECODER	0x818B = 01
+Scan Memory = ALL	0x818B = 02
+
+
 GNSS = OFF	0x79A3 = 00
 GNSS = ON	0x79A3 = 80
 
