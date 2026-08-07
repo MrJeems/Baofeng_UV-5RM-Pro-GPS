@@ -10,6 +10,26 @@ NOAA Weather
 
 
 =SUBMENU ITEMS=
+==Scan==
+Freq Ranger
+
+Chan Ranger
+
+Scan Mode
+-TO
+-CO
+-SE
+
+Scan SubCode
+-CTCSS
+-DCS
+
+Scan Memory
+-ENCODER
+-DECODER
+-ALL
+
+
 ==Radio Setting==
 Squelch
 -OFF
