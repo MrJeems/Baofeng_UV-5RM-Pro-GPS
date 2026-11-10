@@ -1,27 +1,20 @@
-# Copyright 2026 MrJeems <dev@mrjeems.com> (UV-5RM PRO radio offsets, decoding, and testing)
-# Copyright 2025 Mike Iacovacci <ascendr@linuxmail.org> (Original UV-5RM Pro Base)
-# Copyright 2026 Dan <dannjb@gmail.com> (Reference for LMR Zone architecture)
+# Copyright 2026 MrJeems <dev@mrjeems.com>
+# (UV-5RM PRO radio offsets, decoding, and testing)
+# Copyright 2025 Mike Iacovacci <ascendr@linuxmail.org>
+# (Original UV-5RM Pro Base)
+# Copyright 2026 Dan <dannjb@gmail.com> (Ref for LMR Zone architecture)
 # Copyright 2023 Sander van der Wel (Reference for UV17Pro memory map)
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
+# the Free Software Foundation, either version 2 of the License, or
 # (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """Baofeng UV-5RM PRO GPS radio management module"""
 
 import struct
 import logging
 import time
-import random
 from datetime import datetime
 from chirp import chirp_common, directory, memmap
 from chirp import bitwise, errors
@@ -29,35 +22,28 @@ from chirp.settings import (
     RadioSetting, RadioSettingGroup,
     RadioSettingValueInteger, RadioSettingValueList,
     RadioSettingValueBoolean, RadioSettingValueString,
-    RadioSettings, RadioSettingValueMap
+    RadioSettingValueMap, RadioSettings
 )
+
 
 LOG = logging.getLogger(__name__)
 
-# --- GLOBAL CHIRP INJECTIONS FOR CSV EXPORT ---
-_temp_tones = list(chirp_common.TONES)
-for _tone in [63.0, 202.0]:
-    if _tone not in _temp_tones:
-        _temp_tones.append(_tone)
-_temp_tones.sort()
-chirp_common.TONES = tuple(_temp_tones)
-
-_temp_dtcs = list(chirp_common.DTCS_CODES)
-if 17 not in _temp_dtcs:
-    _temp_dtcs.append(17)
-    _temp_dtcs.sort()
-chirp_common.DTCS_CODES = tuple(_temp_dtcs)
 
 XOR_KEY = 0x1D
+
 
 def _xor(data):
     return bytes([x ^ XOR_KEY for x in data])
 
+
 def _clean_read(serial_obj, size):
     data = serial_obj.read(size)
     if len(data) != size:
-        raise errors.RadioError(f"Timeout waiting for data. Expected {size} bytes, got {len(data)}")
+        raise errors.RadioError(
+            "Timeout waiting for data. "
+            f"Expected {size} bytes, got {len(data)}")
     return data
+
 
 VOX_LIST = ["OFF"] + [f"Level {i}" for i in range(1, 10)]
 VOICE_LIST = ["OFF", "Chinese", "English"]
@@ -75,11 +61,14 @@ WX_LIST = [f"WX{i}" for i in range(1, 11)]
 SCAN_MODE_LIST = ["TO", "CO", "SE"]
 SCAN_MEM_LIST = ["ENCODER", "DECODER", "ALL"]
 PROG_KEY_MAP = [
-    ("None", 0x00), ("SCAN", 0x01), ("MONITOR", 0x02), ("FM Radio", 0x04),
-    ("SOS", 0x05), ("GNSS System", 0x06), ("One Touch Search", 0x07),
-    ("1750Hz", 0x09), ("Falling Alarm", 0x0A), ("One Touch Call", 0x0B),
-    ("Zone", 0x0C), ("Battery Display", 0x0D), ("Power", 0x0E), ("Vox", 0x0F)
+    ("None", 0x00), ("SCAN", 0x01), ("MONITOR", 0x02),
+    ("FM Radio", 0x04), ("SOS", 0x05), ("GNSS System", 0x06),
+    ("One Touch Search", 0x07), ("1750Hz", 0x09),
+    ("Falling Alarm", 0x0A), ("One Touch Call", 0x0B),
+    ("Zone", 0x0C), ("Battery Display", 0x0D),
+    ("Power", 0x0E), ("Vox", 0x0F)
 ]
+
 
 # --- FULLY VERIFIED OEM MEMORY MAP ---
 MEM_FORMAT = """
@@ -122,7 +111,7 @@ struct{
     u8          unk_0x1d[1];
     u8          emerg_sys;
     u8          unk_0x1f[1];
-    u8          name[16]; 
+    u8          name[16];
 } memory[640];
 
 # seekto 0x798e;
@@ -138,7 +127,7 @@ struct {
     u8 unk_0x99;
     u8 alert_freq;
     u8 unk_0x9b_9d[3];
-    u8 wx_channel;      
+    u8 wx_channel;
     u8 password_enabled;
     u8 byte_79a0;
     u8 byte_79a1;
@@ -241,6 +230,7 @@ u8 biis_id[2];
 u8 st_bdc1200;
 """
 
+
 ADDRS = [0x000000, 0x100000, 0x200000, 0x300000,
          0x400000, 0x500000, 0x600000, 0x700000,
          0x800000, 0x900000, 0xa00000]
@@ -253,6 +243,7 @@ def raw_send(serial, data, exlen):
     serial.write(data)
     return serial.read(exlen)
 
+
 def wakeup(serial, xor):
     header_sync = b'PROGRAM' + bytes([xor])
     LOG.debug("HANDSHAKE1: Sending T_Info (16 bytes)")
@@ -262,18 +253,22 @@ def wakeup(serial, xor):
     resp = serial.read(16)
 
     if len(resp) >= 1 and resp[0] == 0x41:
-        LOG.debug("HANDSHAKE2: Got 0x41 at %d baud, sending PROGRAM+seed", serial.baudrate)
+        LOG.debug(
+            "HANDSHAKE2: Got 0x41 at %d baud, sending PROGRAM+seed",
+            serial.baudrate)
         serial.write(header_sync)
         return
 
     try:
-        serial.close()
         serial.baudrate = 115200
-        serial.open()
-        serial.dtr = True
-        serial.rts = True
+        try:
+            # Wrap properties in case mock serial pipeline omits them
+            serial.dtr = True
+            serial.rts = True
+            serial.reset_input_buffer()
+        except AttributeError:
+            pass
         time.sleep(0.1)
-        serial.reset_input_buffer()
         serial.write(header_sync)
         return
     except Exception as e:
@@ -281,12 +276,14 @@ def wakeup(serial, xor):
         LOG.error(err)
         raise errors.RadioError(err)
 
+
 def exit_prog(serial, xor):
     ba = [b ^ xor for b in b'END\x00']
     try:
-        resp = raw_send(serial, bytes(ba), 1)
+        raw_send(serial, bytes(ba), 1)
     except Exception as e:
         LOG.warning(f"Exit prog error: {e}")
+
 
 def do_init(serial, xor):
     resp = raw_send(serial, b'', 1)
@@ -296,39 +293,46 @@ def do_init(serial, xor):
     pwd_bytes = bytes([b ^ xor for b in DEFAULT_PWD])
     resp = raw_send(serial, pwd_bytes, 1)
     if len(resp) < 1 or (resp[0] ^ xor) != 0x41:
-        raise errors.RadioError(f"Init HANDSHAKE4 (password) expected 0x41 got {resp!r}")
+        raise errors.RadioError(
+            f"Init HANDSHAKE4 (password) expected 0x41 got {resp!r}")
 
     xs = bytes([xor ^ ord(c) for c in 'INFORMATION'])
     resp = raw_send(serial, xs, 16)
     if len(resp) < 16:
-        raise errors.RadioError(f"Init HANDSHAKE5 short response: got {len(resp)} bytes")
+        raise errors.RadioError(
+            f"Init HANDSHAKE5 short response: got {len(resp)} bytes")
 
-    mode_byte = bytes([xor ^ 0x52])  
+    mode_byte = bytes([xor ^ 0x52])
     resp = raw_send(serial, mode_byte, 1)
     if len(resp) < 1 or (resp[0] ^ xor) != 0x41:
         raise errors.RadioError(f"Init HANDSHAKE6 expected 0x41 got {resp!r}")
+
 
 def read_block(serial, xor, addr, blk_len):
     i_cmd = (0x52000000 + addr) ^ (0x01010101 * xor)
     cmd = struct.pack('>L', i_cmd)
     resp = raw_send(serial, cmd, blk_len + 4)
+    if len(resp) < 4:
+        raise errors.RadioError("Read block response too short")
     i_resp = struct.unpack('>L', resp[:4])[0]
     if i_resp != ((0x57000000 + addr) ^ (0x01010101 * xor)):
         raise errors.RadioError("Read block echo failed")
     return resp[4:]
+
 
 def write_block(serial, xor, addr, data, blk_len):
     i_cmd = (0x57000000 + addr) ^ (0x01010101 * xor)
     cmd = struct.pack('>L', i_cmd)
     resp = raw_send(serial, cmd + data, 1)
     if len(resp) < 1 or (resp[0] ^ xor) != 0x41:
-        raise errors.RadioError(f"Write block ack failed expect 0x41 got {resp[0] if resp else 'empty'}")
+        raise errors.RadioError("Write block ack failed")
     return blk_len
+
 
 def do_download(radio):
     data = b''
     try:
-        xor = random.randint(1, 255)
+        xor = 0x1D
         serial = radio.pipe
         serial.timeout = 5.0
         status = chirp_common.Status()
@@ -342,8 +346,7 @@ def do_download(radio):
         status.msg = "Downloading..."
         for addr in ADDRS:
             resp = read_block(serial, xor, addr, BLK_SZ)
-            da = bytes([b ^ xor for b in resp])
-            data += da
+            data += bytes([b ^ xor for b in resp])
             status.cur += len(resp)
             radio.status_fn(status)
     except errors.RadioError:
@@ -354,13 +357,15 @@ def do_download(radio):
         exit_prog(serial, xor)
     return memmap.MemoryMapBytes(data)
 
+
 def do_upload(radio):
     try:
-        fmt = "%Y.%m.%d %H:%M"
-        prog_dt = datetime.now().strftime(fmt)
-        radio._memobj.dev_info.last_prog = prog_dt
+        prog_dt = datetime.now().strftime("%Y.%m.%d %H:%M")
+        dt_bytes = prog_dt.encode('ascii', 'replace').ljust(16, b'\x00')
+        for i in range(16):
+            radio._memobj.dev_info.last_prog[i] = dt_bytes[i]
 
-        xor = random.randint(1, 255)
+        xor = 0x1D
         serial = radio.pipe
         serial.timeout = 5.0
         status = chirp_common.Status()
@@ -369,16 +374,15 @@ def do_upload(radio):
 
         wakeup(serial, xor)
         do_init(serial, xor)
-        
-        SAFE_BLOCKS = ADDRS
+
         status.max = len(ADDRS) * BLK_SZ
         status.msg = "Uploading..."
-        
+
         for i, addr in enumerate(ADDRS):
             si = BLK_SZ * i
             ei = BLK_SZ * (i + 1)
             data = radio._mmap[si:ei]
-            
+
             LOG.info("Writing block at 0x%06X (4096 bytes)...", addr)
             enc_data = bytes([b ^ xor for b in data])
             resp = write_block(serial, xor, addr, enc_data, BLK_SZ)
@@ -392,27 +396,41 @@ def do_upload(radio):
     finally:
         exit_prog(serial, xor)
 
+
 @directory.register
 class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
     """Baofeng UV-5RM Pro GPS"""
     VENDOR = "Baofeng"
     MODEL = "UV-5RM Pro GPS"
     BAUD_RATE = 19200
-    
+
     POWER_LEVELS = [chirp_common.PowerLevel("Low",  watts=2.00),
                     chirp_common.PowerLevel("Medium", watts=5.00),
                     chirp_common.PowerLevel("High", watts=10.00)]
-                    
+
     VALID_MODES = ["NFM", "FM"]
     VALID_BANDS = [(136000000, 174000000), (400000000, 470000000)]
-    VALID_TONES = (63.0, ) + chirp_common.TONES
-    VALID_DCS = (17, 50, 645) + chirp_common.DTCS_CODES
+
+    _temp_tones = list(chirp_common.TONES)
+    if 63.0 not in _temp_tones:
+        _temp_tones.append(63.0)
+    if 202.0 not in _temp_tones:
+        _temp_tones.append(202.0)
+    _temp_tones.sort()
+    VALID_TONES = tuple(_temp_tones)
+
+    _temp_dtcs = list(chirp_common.DTCS_CODES)
+    if 17 not in _temp_dtcs:
+        _temp_dtcs.append(17)
+    _temp_dtcs.sort()
+    VALID_DCS = tuple(_temp_dtcs)
+
     VALID_CHARSET = "".join(chr(i) for i in range(32, 127))
-    
+
     def get_features(self):
         rf = chirp_common.RadioFeatures()
         rf.has_settings = True
-        rf.has_bank = False 
+        rf.has_bank = False
         rf.has_tuning_step = False
         rf.has_name = True
         rf.valid_characters = self.VALID_CHARSET
@@ -425,18 +443,22 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         rf.has_ctone = True
         rf.has_cross = True
         rf.valid_tones = self.VALID_TONES
-        rf.can_odd_split = False
+        rf.can_odd_split = True
         rf.can_delete = True
         rf.valid_modes = self.VALID_MODES
-        rf.valid_duplexes = ["", "-", "+", "off"]
+        rf.valid_duplexes = ["", "-", "+", "split", "off"]
         rf.valid_tmodes = ["", "Tone", "TSQL", "DTCS", "Cross"]
         rf.valid_cross_modes = [
             "Tone->DTCS", "DTCS->Tone", "->Tone",
-            "Tone->Tone", "->DTCS", "DTCS->", "DTCS->DTCS"]
+            "Tone->Tone", "->DTCS", "DTCS->", "DTCS->DTCS"
+        ]
         rf.valid_power_levels = self.POWER_LEVELS
         rf.valid_skips = ["", "S"]
         rf.valid_bands = self.VALID_BANDS
         rf.memory_bounds = (1, 640)
+        rf.valid_tuning_steps = [
+            2.5, 5.0, 6.25, 8.33, 10.0, 12.5, 20.0, 25.0, 50.0
+        ]
         return rf
 
     def process_mmap(self):
@@ -450,28 +472,30 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         self._mmap = data
         self.process_mmap()
 
-    # CRITICAL: The UV-5RM Pro GPS uses strict 64-channel physical memory partitions for Zones.
-    # It does NOT use dynamic linked lists for channel assignment. 
+    # CRITICAL: The UV-5RM Pro GPS uses strict 64-channel physical memory
+    # partitions for Zones. It does NOT use dynamic linked lists.
     # Zone 1 strictly owns global channels 1-64. Zone 2 owns 65-128, etc.
-    # The array requires 1-based indexing, Big-Endian formatting (u16), and 0x0000 padding.
+    # The array requires 1-based indexing, Big-Endian formatting, and padding.
     def sync_out(self):
+        if self._memobj is None:
+            self.process_mmap()
+
         zones_used = 0
         for z in range(10):
             z_obj = self._memobj.zones[z]
             count = 0
-            
-            # Map up to 64 consecutive memory channels to each respective Zone
+
             for idx in range(64):
                 global_ch = (z * 64) + idx
                 if not self.get_empty(global_ch):
-                    z_obj.channels[idx] = global_ch 
+                    z_obj.channels[idx] = global_ch
                     count += 1
                 else:
                     z_obj.channels[idx] = 0xFFFF
-            
+
             z_obj.count = count
             z_obj.unknown0 = 0xFF
-            
+
             if count > 0:
                 zones_used += 1
 
@@ -486,11 +510,13 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         mem = chirp_common.Memory()
         mem.number = number
         _mem = self._memobj.memory[number-1]
-        mem.freq = int(_mem.rx_freq) * 10
-        if self.get_empty(number - 1):
+
+        if self.get_empty(number - 1) or _mem.get_raw()[0] == 255:
             mem.empty = True
             return mem
-            
+
+        mem.freq = int(_mem.rx_freq) * 10
+
         name_chars = []
         for c in _mem.name:
             val = int(c)
@@ -499,46 +525,75 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
             if 32 <= val < 127:
                 name_chars.append(chr(val))
             else:
-                name_chars.append(' ') 
+                name_chars.append(' ')
         mem.name = "".join(name_chars).rstrip()
-        
-        mem.power = self.POWER_LEVELS[int(_mem.power) if int(_mem.power) < 3 else 2]
+
+        mem.power = self.POWER_LEVELS[
+            int(_mem.power) if int(_mem.power) < 3 else 2
+        ]
         mem.mode = self.VALID_MODES[_mem.bandwidth]
         mem.skip = 'S' if self.get_skip(number - 1) else ""
 
-        if int(_mem.tx_freq) == int(_mem.rx_freq):
+        tx_freq = int(_mem.tx_freq) * 10
+        if tx_freq == mem.freq:
             mem.duplex = ''
             mem.offset = 0
-        elif int(_mem.tx_freq) == 0:
+        elif tx_freq == 0 or tx_freq == (0xFFFFFFFF * 10):
             mem.duplex = 'off'
             mem.offset = 0
-        elif int(_mem.tx_freq) > int(_mem.rx_freq):
-            mem.duplex = '+'
-            mem.offset = (int(_mem.tx_freq) - int(_mem.rx_freq)) * 10
-        elif int(_mem.rx_freq) > int(_mem.tx_freq):
-            mem.duplex = '-'
-            mem.offset = ((int(_mem.rx_freq) - int(_mem.tx_freq)) * 10)
+        else:
+            offset = abs(tx_freq - mem.freq)
+            if chirp_common.is_split(
+                    self.get_features().valid_bands,
+                    mem.freq,
+                    tx_freq):
+                mem.duplex = "split"
+                mem.offset = tx_freq
+            elif tx_freq > mem.freq:
+                mem.duplex = "+"
+                mem.offset = offset
+            else:
+                mem.duplex = "-"
+                mem.offset = offset
 
         self.get_tones(_mem, mem)
 
         mem.extra = RadioSettingGroup("Extra", "extra")
-        
-        mem.extra.append(RadioSetting("invert", "TX Invert", RadioSettingValueBoolean(bool(int(_mem.invert)))))
-        mem.extra.append(RadioSetting("talkaround", "Talkaround", RadioSettingValueBoolean(bool(int(_mem.talkaround)))))
 
-        rstype = RadioSettingValueMap([('Off', 0), ('PTT BOT', 1), ('PTT EOT', 2), ('PTT Both', 3), ('5-Tone BOT', 4), ('5-Tone EOT', 8), ('5-Tone Both', 12)], int(_mem.pttid_mode))
+        mem.extra.append(RadioSetting(
+            "invert", "TX Invert",
+            RadioSettingValueBoolean(bool(int(_mem.invert)))))
+        mem.extra.append(RadioSetting(
+            "talkaround", "Talkaround",
+            RadioSettingValueBoolean(bool(int(_mem.talkaround)))))
+
+        rstype = RadioSettingValueMap([
+            ('Off', 0), ('PTT BOT', 1), ('PTT EOT', 2),
+            ('PTT Both', 3), ('5-Tone BOT', 4),
+            ('5-Tone EOT', 8), ('5-Tone Both', 12)
+        ], int(_mem.pttid_mode))
         mem.extra.append(RadioSetting("pttid_mode", "PTT/5-Tone ID", rstype))
 
-        rstype = RadioSettingValueMap([('Off', 0), ('CTDCS', 1), ('Optional', 2), ('Both', 3)], int(_mem.sqlch_mode))
+        rstype = RadioSettingValueMap([
+            ('Off', 0), ('CTDCS', 1), ('Optional', 2), ('Both', 3)
+        ], int(_mem.sqlch_mode))
         mem.extra.append(RadioSetting("sqlch_mode", "SP-Mute", rstype))
 
-        rstype = RadioSettingValueMap([('Off', 0), ('DTMF', 2), ('2-Tone', 4), ('5-Tone', 6), ('MDC', 8), ('BDC1200', 10), ('BIIS', 12)], int(_mem.signaling))
+        rstype = RadioSettingValueMap([
+            ('Off', 0), ('DTMF', 2), ('2-Tone', 4),
+            ('5-Tone', 6), ('MDC', 8), ('BDC1200', 10), ('BIIS', 12)
+        ], int(_mem.signaling))
         mem.extra.append(RadioSetting("signaling", "Signaling", rstype))
 
-        rstype = RadioSettingValueMap([('Off', 0), ('Normal', 1), ('Strict', 2)], int(_mem.jump_mode))
-        mem.extra.append(RadioSetting("jump_mode", "Frequency Jump", rstype))
+        rstype = RadioSettingValueMap([
+            ('Off', 0), ('Normal', 1), ('Strict', 2)
+        ], int(_mem.jump_mode))
+        mem.extra.append(RadioSetting(
+            "jump_mode", "Frequency Jump", rstype))
 
-        mem.extra.append(RadioSetting("launch_banned", "Busy Lockout", RadioSettingValueBoolean(bool(int(_mem.launch_banned)))))
+        mem.extra.append(RadioSetting(
+            "launch_banned", "Busy Lockout",
+            RadioSettingValueBoolean(bool(int(_mem.launch_banned)))))
 
         return mem
 
@@ -552,8 +607,7 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
 
         if self.get_empty(mem.number - 1):
             self.set_empty(mem.number - 1, 0)
-            _mem.set_raw(b'\x00' * 48) 
-            mem.duplex = ''
+            _mem.set_raw(b'\x00' * 48)
 
         _mem.rx_freq = mem.freq // 10
 
@@ -567,21 +621,24 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         for i in range(16):
             _mem.name[i] = name_bytes[i]
 
-        _skip = 1 if mem.skip == 'S' else 0
-        self.set_skip(mem.number - 1, _skip)
+        self.set_skip(mem.number - 1, mem.skip == 'S')
         _mem.bandwidth = self.VALID_MODES.index(mem.mode)
-        
+
         # Enforce OEM CPS default padding block logic
         for i in range(5):
             _mem.unk_0x14_18[i] = 0x05
-            
+
         self.set_tone(_mem, mem)
 
         if mem.duplex == '+':
             _mem.tx_freq = (mem.freq + mem.offset) // 10
         elif mem.duplex == '-':
             _mem.tx_freq = (mem.freq - mem.offset) // 10
-        elif mem.duplex == '' or mem.duplex == 'off':
+        elif mem.duplex == 'split':
+            _mem.tx_freq = mem.offset // 10
+        elif mem.duplex == 'off':
+            _mem.tx_freq.set_value(0)
+        else:
             _mem.tx_freq.set_value(int(_mem.rx_freq))
 
         for setting in mem.extra:
@@ -640,23 +697,20 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
             _mem.rx_tone.set_raw(bytes([msb, lsb]))
 
     def get_skip(self, chan_n):
-        val = self._memobj.scan_skip['bitfield'][chan_n].get_value()
-        return bool(val)
+        val = self._memobj.scan_skip.bitfield[chan_n]
+        return bool(int(val))
 
     def set_skip(self, chan_n, value):
-        val = 1 if value else 0
-        self._memobj.scan_skip['bitfield'][chan_n].set_value(val)
+        self._memobj.scan_skip.bitfield[chan_n] = 1 if value else 0
 
     def get_empty(self, chan_n):
-        val = self._memobj.chan_valid['bitfield'][chan_n].get_value()
-        return bool(val)
+        val = self._memobj.chan_valid.bitfield[chan_n]
+        return bool(int(val))
 
     def set_empty(self, chan_n, value):
-        val = 1 if value else 0
-        self._memobj.chan_valid['bitfield'][chan_n].set_value(val)
+        self._memobj.chan_valid.bitfield[chan_n] = 1 if value else 0
 
     def get_settings(self):
-        top = RadioSettingGroup("top", "UV-5RM Pro GPS Settings")
         basic = RadioSettingGroup("basic", "Basic Settings")
         ui = RadioSettingGroup("ui", "UI & Display")
         gps = RadioSettingGroup("gps", "GNSS Settings")
@@ -674,143 +728,255 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
             if 32 <= b < 127:
                 name_chars.append(chr(b))
         name_str = "".join(name_chars).strip()
-        rs_name = RadioSetting("radio_name", "Radio Name", RadioSettingValueString(0, 16, name_str))
+        rs_name = RadioSetting(
+            "radio_name", "Radio Name",
+            RadioSettingValueString(0, 16, name_str))
         rs_name.value.set_charset(self.VALID_CHARSET)
         basic.append(rs_name)
-        
+
         val_79a0 = int(self._memobj.glob_settings.byte_79a0)
-        
+
         vox_on = bool((val_79a0 & 0x80) == 0x80)
         vox_level = int(self._memobj.glob_settings.vox_lvl) if vox_on else 0
-        if vox_level > 9: vox_level = 0
-        basic.append(RadioSetting("vox", "VOX Level", RadioSettingValueList(options=VOX_LIST, current_index=vox_level)))
-        
+        if vox_level > 9:
+            vox_level = 0
+        basic.append(RadioSetting(
+            "vox", "VOX Level",
+            RadioSettingValueList(options=VOX_LIST, current_index=vox_level)))
+
         aprs_on = bool((val_79a0 & 0x40) == 0x40)
-        gps.append(RadioSetting("aprs", "GNSS APRS", RadioSettingValueBoolean(aprs_on)))
-        
+        gps.append(RadioSetting(
+            "aprs", "GNSS APRS",
+            RadioSettingValueBoolean(aprs_on)))
+
         voice_val = (val_79a0 & 0x0C) >> 2
-        if voice_val > 2: voice_val = 0
-        basic.append(RadioSetting("voice", "Voice Prompt", RadioSettingValueList(options=VOICE_LIST, current_index=voice_val)))
-        
+        if voice_val > 2:
+            voice_val = 0
+        basic.append(RadioSetting(
+            "voice", "Voice Prompt",
+            RadioSettingValueList(
+                options=VOICE_LIST,
+                current_index=voice_val)))
+
         val_79a1 = int(self._memobj.glob_settings.byte_79a1)
         autolock_on = bool((val_79a1 & 0x40) == 0x40)
-        basic.append(RadioSetting("autolock", "Auto Keypad Lock", RadioSettingValueBoolean(autolock_on)))
+        basic.append(RadioSetting(
+            "autolock", "Auto Keypad Lock",
+            RadioSettingValueBoolean(autolock_on)))
 
         val_79a2 = int(self._memobj.glob_settings.byte_79a2)
         beep_on = bool((val_79a2 & 0x80) == 0x80)
-        basic.append(RadioSetting("beep", "Keypad Beep", RadioSettingValueBoolean(beep_on)))
-        
+        basic.append(RadioSetting(
+            "beep", "Keypad Beep",
+            RadioSettingValueBoolean(beep_on)))
+
         roger_val = (val_79a2 & 0x60) >> 5
-        if roger_val > 3: roger_val = 0
-        basic.append(RadioSetting("roger", "Roger Beep", RadioSettingValueList(options=ROGER_LIST, current_index=roger_val)))
-        
+        if roger_val > 3:
+            roger_val = 0
+        basic.append(RadioSetting(
+            "roger", "Roger Beep",
+            RadioSettingValueList(
+                options=ROGER_LIST,
+                current_index=roger_val)))
+
         val_79a3 = int(self._memobj.glob_settings.byte_79a3)
         gnss_on = bool((val_79a3 & 0x80) == 0x80)
-        gps.append(RadioSetting("gnss", "GNSS Enable", RadioSettingValueBoolean(gnss_on)))
-                     
+        gps.append(RadioSetting(
+            "gnss", "GNSS Enable",
+            RadioSettingValueBoolean(gnss_on)))
+
         radio_int = bool((val_79a3 & 0x04) == 0x04)
-        basic.append(RadioSetting("radio_int", "Radio Interrupt", RadioSettingValueBoolean(radio_int)))
+        basic.append(RadioSetting(
+            "radio_int", "Radio Interrupt",
+            RadioSettingValueBoolean(radio_int)))
 
         val_79a5 = int(self._memobj.glob_settings.byte_79a5)
         display_val = val_79a5 & 0x03
-        if display_val > 2: display_val = 0
-        ui.append(RadioSetting("display", "Power On Display", RadioSettingValueList(options=DISPLAY_LIST, current_index=display_val)))
-        
+        if display_val > 2:
+            display_val = 0
+        ui.append(RadioSetting(
+            "display", "Power On Display",
+            RadioSettingValueList(
+                options=DISPLAY_LIST,
+                current_index=display_val)))
+
         lang_val = (val_79a5 & 0x04) >> 2
-        if lang_val > 1: lang_val = 0
-        ui.append(RadioSetting("language", "Language", RadioSettingValueList(options=LANG_LIST, current_index=lang_val)))
-        
+        if lang_val > 1:
+            lang_val = 0
+        ui.append(RadioSetting(
+            "language", "Language",
+            RadioSettingValueList(
+                options=LANG_LIST,
+                current_index=lang_val)))
+
         noaa_alert = bool((val_79a5 & 0x08) == 0x08)
-        basic.append(RadioSetting("noaa_alert", "NOAA WX Alert", RadioSettingValueBoolean(noaa_alert)))
+        basic.append(RadioSetting(
+            "noaa_alert", "NOAA WX Alert",
+            RadioSettingValueBoolean(noaa_alert)))
 
         val_79a6 = int(self._memobj.glob_settings.byte_79a6)
         tail_val = (val_79a6 & 0xE0) >> 5
-        if tail_val > 4: tail_val = 0
-        basic.append(RadioSetting("tail", "Squelch Tail", RadioSettingValueList(options=TAIL_LIST, current_index=tail_val)))
-        
+        if tail_val > 4:
+            tail_val = 0
+        basic.append(RadioSetting(
+            "tail", "Squelch Tail",
+            RadioSettingValueList(
+                options=TAIL_LIST,
+                current_index=tail_val)))
+
         noaa_on = bool((val_79a6 & 0x10) == 0x10)
-        basic.append(RadioSetting("noaa_on", "NOAA Weather Enable", RadioSettingValueBoolean(noaa_on)))
+        basic.append(RadioSetting(
+            "noaa_on", "NOAA Weather Enable",
+            RadioSettingValueBoolean(noaa_on)))
 
         wx_val = int(self._memobj.glob_settings.wx_channel)
-        if wx_val > 9: wx_val = 0
-        basic.append(RadioSetting("wx_channel", "NOAA Weather Channel", RadioSettingValueList(options=WX_LIST, current_index=wx_val)))
-        
+        if wx_val > 9:
+            wx_val = 0
+        basic.append(RadioSetting(
+            "wx_channel", "NOAA Weather Channel",
+            RadioSettingValueList(options=WX_LIST, current_index=wx_val)))
+
         dir_val = (val_79a6 & 0x08) >> 3
-        if dir_val > 1: dir_val = 0
-        ui.append(RadioSetting("dir", "Display Direction", RadioSettingValueList(options=DIR_LIST, current_index=dir_val)))
+        if dir_val > 1:
+            dir_val = 0
+        ui.append(RadioSetting(
+            "dir", "Display Direction",
+            RadioSettingValueList(options=DIR_LIST, current_index=dir_val)))
 
         tot_val = int(self._memobj.glob_settings.tot)
-        if tot_val > 14: tot_val = 0
-        basic.append(RadioSetting("tot", "Time-Out Timer (TOT)", RadioSettingValueList(options=TOT_LIST, current_index=tot_val)))
+        if tot_val > 14:
+            tot_val = 0
+        basic.append(RadioSetting(
+            "tot", "Time-Out Timer (TOT)",
+            RadioSettingValueList(options=TOT_LIST, current_index=tot_val)))
 
         toa_val = int(self._memobj.glob_settings.toa)
-        if toa_val > 10: toa_val = 0
-        basic.append(RadioSetting("toa", "Timer Pre-Alarm (TOA)", RadioSettingValueList(options=TOA_LIST, current_index=toa_val)))
+        if toa_val > 10:
+            toa_val = 0
+        basic.append(RadioSetting(
+            "toa", "Timer Pre-Alarm (TOA)",
+            RadioSettingValueList(options=TOA_LIST, current_index=toa_val)))
 
         ptt_dly_val = int(self._memobj.dtmf.delay_tm)
-        if ptt_dly_val > 249: ptt_dly_val = 0
-        basic.append(RadioSetting("ptt_dly", "PTT-ID Delay", RadioSettingValueList(options=PTT_DLY_LIST, current_index=ptt_dly_val)))
-                     
+        if ptt_dly_val > 249:
+            ptt_dly_val = 0
+        basic.append(RadioSetting(
+            "ptt_dly", "PTT-ID Delay",
+            RadioSettingValueList(
+                options=PTT_DLY_LIST,
+                current_index=ptt_dly_val)))
+
         apo_val = int(self._memobj.glob_settings.apo)
-        if apo_val > 5: apo_val = 0
-        basic.append(RadioSetting("apo", "Auto Power Off (APO)", RadioSettingValueList(options=APO_LIST, current_index=apo_val)))
-                     
+        if apo_val > 5:
+            apo_val = 0
+        basic.append(RadioSetting(
+            "apo", "Auto Power Off (APO)",
+            RadioSettingValueList(options=APO_LIST, current_index=apo_val)))
+
         alert_val = int(self._memobj.glob_settings.alert_freq)
-        if alert_val > 3: alert_val = 0
-        basic.append(RadioSetting("alert", "Alert Tone", RadioSettingValueList(options=ALERT_LIST, current_index=alert_val)))
+        if alert_val > 3:
+            alert_val = 0
+        basic.append(RadioSetting(
+            "alert", "Alert Tone",
+            RadioSettingValueList(
+                options=ALERT_LIST,
+                current_index=alert_val)))
 
         tz_raw = int(self._memobj.glob_settings.gps_zone)
         tz_val = tz_raw - 12
-        if tz_val < -12 or tz_val > 12: tz_val = 0
-        gps.append(RadioSetting("timezone", "GNSS Time Zone", RadioSettingValueInteger(-12, 12, tz_val)))
+        if tz_val < -12 or tz_val > 12:
+            tz_val = 0
+        gps.append(RadioSetting(
+            "timezone", "GNSS Time Zone",
+            RadioSettingValueInteger(-12, 12, tz_val)))
 
         pwd_raw = int(self._memobj.glob_settings.password_enabled)
         pwd_toggle = bool(pwd_raw == 1)
-        basic.append(RadioSetting("password_enabled", "Password Enabled", RadioSettingValueBoolean(pwd_toggle)))
+        basic.append(RadioSetting(
+            "password_enabled", "Password Enabled",
+            RadioSettingValueBoolean(pwd_toggle)))
 
         raw_pwd = self._memobj.power_on_pwd
-        pwd_str = "".join([chr(int(b)) for b in raw_pwd if 0x30 <= int(b) <= 0x39])
-        rs_pwd = RadioSetting("password", "Power-on Password", RadioSettingValueString(0, 8, pwd_str))
+        pwd_str = "".join([
+            chr(int(b)) for b in raw_pwd if 0x30 <= int(b) <= 0x39
+        ])
+        rs_pwd = RadioSetting(
+            "password", "Power-on Password",
+            RadioSettingValueString(0, 8, pwd_str))
         rs_pwd.value.set_charset("0123456789 ")
         basic.append(rs_pwd)
 
-        sidetone.append(RadioSetting("st_dtmf", "DTMF Sidetone", RadioSettingValueBoolean(bool(int(self._memobj.dtmf.dtmf_st)))))
-        sidetone.append(RadioSetting("st_2tone", "2Tone Sidetone", RadioSettingValueBoolean(bool(int(self._memobj.st_2tone)))))
-        sidetone.append(RadioSetting("st_5tone", "5Tone Sidetone", RadioSettingValueBoolean(bool(int(self._memobj.st_5tone)))))
-        sidetone.append(RadioSetting("st_bdc", "BDC1200 Sidetone", RadioSettingValueBoolean(bool(int(self._memobj.st_bdc1200)))))
-        
-        dtmf_str = "".join([str(int(b)) for b in self._memobj.dtmf.self_id if 0 <= int(b) <= 9])
-        rs_dtmf = RadioSetting("dtmf_id", "DTMF ID", RadioSettingValueString(0, 3, dtmf_str))
+        sidetone.append(RadioSetting(
+            "st_dtmf", "DTMF Sidetone",
+            RadioSettingValueBoolean(bool(int(self._memobj.dtmf.dtmf_st)))))
+        sidetone.append(RadioSetting(
+            "st_2tone", "2Tone Sidetone",
+            RadioSettingValueBoolean(bool(int(self._memobj.st_2tone)))))
+        sidetone.append(RadioSetting(
+            "st_5tone", "5Tone Sidetone",
+            RadioSettingValueBoolean(bool(int(self._memobj.st_5tone)))))
+        sidetone.append(RadioSetting(
+            "st_bdc", "BDC1200 Sidetone",
+            RadioSettingValueBoolean(bool(int(self._memobj.st_bdc1200)))))
+
+        dtmf_str = "".join([
+            str(int(b)) for b in self._memobj.dtmf.self_id
+            if 0 <= int(b) <= 9
+        ])
+        rs_dtmf = RadioSetting(
+            "dtmf_id", "DTMF ID",
+            RadioSettingValueString(0, 3, dtmf_str))
         rs_dtmf.value.set_charset("0123456789 ")
         ident.append(rs_dtmf)
 
-        fivetone_str = "".join([str(int(b)) for b in self._memobj.fivetone_id if 0 <= int(b) <= 9])
-        rs_5t = RadioSetting("fivetone_id", "5Tone ID", RadioSettingValueString(0, 5, fivetone_str))
+        fivetone_str = "".join([
+            str(int(b)) for b in self._memobj.fivetone_id
+            if 0 <= int(b) <= 9
+        ])
+        rs_5t = RadioSetting(
+            "fivetone_id", "5Tone ID",
+            RadioSettingValueString(0, 5, fivetone_str))
         rs_5t.value.set_charset("0123456789 ")
         ident.append(rs_5t)
-        
+
         raw_biis = self._mmap[0x9c80:0x9c82]
-        biis_val = (raw_biis[0] << 8) | raw_biis[1] 
-        
+        biis_val = (raw_biis[0] << 8) | raw_biis[1]
+
         label = "BIIS ID"
-        if biis_val > 9999: biis_val = 0
-        ident.append(RadioSetting("biis_id", label, RadioSettingValueInteger(0, 9999, biis_val)))
+        if biis_val > 9999:
+            biis_val = 0
+        ident.append(RadioSetting(
+            "biis_id", label,
+            RadioSettingValueInteger(0, 9999, biis_val)))
 
         val_pf1_s = int(self._memobj.prog_key.pf1_short)
-        if val_pf1_s not in [v for k, v in PROG_KEY_MAP]: val_pf1_s = 0
-        keys.append(RadioSetting("pf1_short", "SK1 (PF1) Short Press", RadioSettingValueMap(PROG_KEY_MAP, val_pf1_s)))
-        
+        valid_keys = [v for k, v in PROG_KEY_MAP]
+        if val_pf1_s not in valid_keys:
+            val_pf1_s = 0
+        keys.append(RadioSetting(
+            "pf1_short", "SK1 (PF1) Short Press",
+            RadioSettingValueMap(PROG_KEY_MAP, val_pf1_s)))
+
         val_pf2_s = int(self._memobj.prog_key.pf2_short)
-        if val_pf2_s not in [v for k, v in PROG_KEY_MAP]: val_pf2_s = 0
-        keys.append(RadioSetting("pf2_short", "SK2 (PF2) Short Press", RadioSettingValueMap(PROG_KEY_MAP, val_pf2_s)))
-        
+        if val_pf2_s not in valid_keys:
+            val_pf2_s = 0
+        keys.append(RadioSetting(
+            "pf2_short", "SK2 (PF2) Short Press",
+            RadioSettingValueMap(PROG_KEY_MAP, val_pf2_s)))
+
         val_pf1_l = int(self._memobj.prog_key.pf1_long)
-        if val_pf1_l not in [v for k, v in PROG_KEY_MAP]: val_pf1_l = 0
-        keys.append(RadioSetting("pf1_long", "SK1 (PF1) Long Press", RadioSettingValueMap(PROG_KEY_MAP, val_pf1_l)))
-        
+        if val_pf1_l not in valid_keys:
+            val_pf1_l = 0
+        keys.append(RadioSetting(
+            "pf1_long", "SK1 (PF1) Long Press",
+            RadioSettingValueMap(PROG_KEY_MAP, val_pf1_l)))
+
         val_pf2_l = int(self._memobj.prog_key.pf2_long)
-        if val_pf2_l not in [v for k, v in PROG_KEY_MAP]: val_pf2_l = 0
-        keys.append(RadioSetting("pf2_long", "SK2 (PF2) Long Press", RadioSettingValueMap(PROG_KEY_MAP, val_pf2_l)))
+        if val_pf2_l not in valid_keys:
+            val_pf2_l = 0
+        keys.append(RadioSetting(
+            "pf2_long", "SK2 (PF2) Long Press",
+            RadioSettingValueMap(PROG_KEY_MAP, val_pf2_l)))
 
         for i in range(10):
             _zone = self._memobj.zones[i]
@@ -822,43 +988,52 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                 if 32 <= val < 127:
                     name_chars.append(chr(val))
             zname_str = "".join(name_chars).strip()
-            rs_zname = RadioSetting(f"zone_name_{i}", f"Zone {i+1} Name", RadioSettingValueString(0, 16, zname_str))
+            rs_zname = RadioSetting(
+                f"zone_name_{i}", f"Zone {i+1} Name",
+                RadioSettingValueString(0, 16, zname_str))
             rs_zname.value.set_charset(self.VALID_CHARSET)
             zones.append(rs_zname)
 
         scan_mode_idx = int(self._memobj.scan_menu.scan_mode)
-        if scan_mode_idx >= len(SCAN_MODE_LIST): scan_mode_idx = 0
-        scan.append(RadioSetting("scan_mode", "Scan Mode", RadioSettingValueList(options=SCAN_MODE_LIST, current_index=scan_mode_idx)))
+        if scan_mode_idx >= len(SCAN_MODE_LIST):
+            scan_mode_idx = 0
+        scan.append(RadioSetting(
+            "scan_mode", "Scan Mode",
+            RadioSettingValueList(
+                options=SCAN_MODE_LIST,
+                current_index=scan_mode_idx)))
 
         scan_mem_idx = int(self._memobj.scan_menu.scan_memory)
-        if scan_mem_idx >= len(SCAN_MEM_LIST): scan_mem_idx = 0
-        scan.append(RadioSetting("scan_memory", "Scan Memory", RadioSettingValueList(options=SCAN_MEM_LIST, current_index=scan_mem_idx)))
+        if scan_mem_idx >= len(SCAN_MEM_LIST):
+            scan_mem_idx = 0
+        scan.append(RadioSetting(
+            "scan_memory", "Scan Memory",
+            RadioSettingValueList(
+                options=SCAN_MEM_LIST,
+                current_index=scan_mem_idx)))
 
-        top.append(basic)
-        top.append(ui)
-        top.append(gps)
-        top.append(sidetone)
-        top.append(ident)
-        top.append(keys)
-        top.append(scan)
-        top.append(zones)
-        
-        return top
+        return RadioSettings(
+            basic, ui, gps, sidetone, ident, keys, scan, zones
+        )
 
     def set_settings(self, settings):
         for element in settings:
             if not isinstance(element, RadioSetting):
                 self.set_settings(element)
                 continue
-                
+
             setting = element.get_name()
             value = element.value
 
-            # The radio OS parses the Radio Name as a standard C-string. 
-            # It MUST be padded with Null bytes (\x00), NOT \xFF. 
-            # Padding with \xFF causes the radio UI to render literal blank spaces on the screen.
+            # The radio OS parses the Radio Name as a standard C-string.
+            # It MUST be padded with Null bytes (\x00), NOT \xFF.
+            # \xFF causes the UI to render literal blank spaces.
             if setting == "radio_name":
-                clean_name = str(value.get_value()).strip() if hasattr(value, 'get_value') else str(value).strip()
+                clean_name = (
+                    str(value.get_value()).strip()
+                    if hasattr(value, 'get_value')
+                    else str(value).strip()
+                )
                 name_bytes = clean_name.encode('ascii', 'replace')
                 name_bytes = name_bytes.ljust(16, b'\x00')[:16]
                 for i in range(16):
@@ -867,10 +1042,10 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
             elif setting == "vox":
                 val = int(self._memobj.glob_settings.byte_79a0)
                 if int(value) == 0:
-                    self._memobj.glob_settings.byte_79a0 = val & 0x7F 
-                    self._memobj.glob_settings.vox_lvl = 0x01 
+                    self._memobj.glob_settings.byte_79a0 = val & 0x7F
+                    self._memobj.glob_settings.vox_lvl = 0x01
                 else:
-                    self._memobj.glob_settings.byte_79a0 = val | 0x80 
+                    self._memobj.glob_settings.byte_79a0 = val | 0x80
                     self._memobj.glob_settings.vox_lvl = int(value)
             elif setting == "aprs":
                 val = int(self._memobj.glob_settings.byte_79a0)
@@ -880,8 +1055,10 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                     self._memobj.glob_settings.byte_79a0 = val & 0xBF
             elif setting == "voice":
                 val = int(self._memobj.glob_settings.byte_79a0)
-                self._memobj.glob_settings.byte_79a0 = (val & 0xF3) | (int(value) << 2)
-                
+                mask = val & 0xF3
+                val_int = int(value)
+                self._memobj.glob_settings.byte_79a0 = mask | (val_int << 2)
+
             elif setting == "autolock":
                 val = int(self._memobj.glob_settings.byte_79a1)
                 if value:
@@ -897,8 +1074,10 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                     self._memobj.glob_settings.byte_79a2 = val & 0x7F
             elif setting == "roger":
                 val = int(self._memobj.glob_settings.byte_79a2)
-                self._memobj.glob_settings.byte_79a2 = (val & 0x9F) | (int(value) << 5)
-                
+                mask = val & 0x9F
+                val_int = int(value)
+                self._memobj.glob_settings.byte_79a2 = mask | (val_int << 5)
+
             elif setting == "gnss":
                 val = int(self._memobj.glob_settings.byte_79a3)
                 if value:
@@ -914,20 +1093,25 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
 
             elif setting == "display":
                 val = int(self._memobj.glob_settings.byte_79a5)
-                self._memobj.glob_settings.byte_79a5 = (val & 0xFC) | int(value)
+                mask = val & 0xFC
+                self._memobj.glob_settings.byte_79a5 = mask | int(value)
             elif setting == "language":
                 val = int(self._memobj.glob_settings.byte_79a5)
-                self._memobj.glob_settings.byte_79a5 = (val & 0xFB) | (int(value) << 2)
+                mask = val & 0xFB
+                val_int = int(value)
+                self._memobj.glob_settings.byte_79a5 = mask | (val_int << 2)
             elif setting == "noaa_alert":
                 val = int(self._memobj.glob_settings.byte_79a5)
                 if value:
                     self._memobj.glob_settings.byte_79a5 = val | 0x08
                 else:
                     self._memobj.glob_settings.byte_79a5 = val & 0xF7
-                    
+
             elif setting == "tail":
                 val = int(self._memobj.glob_settings.byte_79a6)
-                self._memobj.glob_settings.byte_79a6 = (val & 0x1F) | (int(value) << 5)
+                mask = val & 0x1F
+                val_int = int(value)
+                self._memobj.glob_settings.byte_79a6 = mask | (val_int << 5)
             elif setting == "noaa_on":
                 val = int(self._memobj.glob_settings.byte_79a6)
                 if value:
@@ -938,7 +1122,9 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                 self._memobj.glob_settings.wx_channel = int(value)
             elif setting == "dir":
                 val = int(self._memobj.glob_settings.byte_79a6)
-                self._memobj.glob_settings.byte_79a6 = (val & 0xF7) | (int(value) << 3)
+                mask = val & 0xF7
+                val_int = int(value)
+                self._memobj.glob_settings.byte_79a6 = mask | (val_int << 3)
 
             elif setting == "tot":
                 self._memobj.glob_settings.tot = int(value)
@@ -952,11 +1138,14 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                 self._memobj.glob_settings.alert_freq = int(value)
             elif setting == "timezone":
                 self._memobj.glob_settings.gps_zone = int(value) + 12
-                
+
             elif setting == "password_enabled":
-                self._memobj.glob_settings.password_enabled = 0x01 if bool(value) else 0x00
+                pwd_bool = 0x01 if bool(value) else 0x00
+                self._memobj.glob_settings.password_enabled = pwd_bool
             elif setting == "password":
-                clean_pwd = "".join([c for c in str(value) if c.isdigit()])
+                clean_pwd = "".join([
+                    c for c in str(value) if c.isdigit()
+                ])
                 pwd_bytes = [ord(char) for char in clean_pwd]
                 while len(pwd_bytes) < 8:
                     pwd_bytes.append(0xFF)
@@ -964,32 +1153,43 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                     self._memobj.power_on_pwd[i] = pwd_bytes[i]
 
             elif setting == "st_dtmf":
-                self._memobj.dtmf.dtmf_st = 0x01 if bool(value) else 0x00
+                dtmf_bool = 0x01 if bool(value) else 0x00
+                self._memobj.dtmf.dtmf_st = dtmf_bool
             elif setting == "st_2tone":
                 self._memobj.st_2tone = 0x01 if bool(value) else 0x00
             elif setting == "st_5tone":
                 self._memobj.st_5tone = 0x01 if bool(value) else 0x00
             elif setting == "st_bdc":
                 self._memobj.st_bdc1200 = 0x01 if bool(value) else 0x00
-                
+
             elif setting == "dtmf_id":
-                clean_dtmf = "".join([c for c in str(value) if c.isdigit()])
+                clean_dtmf = "".join([
+                    c for c in str(value) if c.isdigit()
+                ])
                 padded = clean_dtmf.ljust(3, '\xFF')
                 for i in range(3):
                     char = padded[i]
-                    self._memobj.dtmf.self_id[i] = int(char) if char != '\xFF' else 0xFF
+                    if char != '\xFF':
+                        self._memobj.dtmf.self_id[i] = int(char)
+                    else:
+                        self._memobj.dtmf.self_id[i] = 0xFF
             elif setting == "fivetone_id":
-                clean_5t = "".join([c for c in str(value) if c.isdigit()])
+                clean_5t = "".join([
+                    c for c in str(value) if c.isdigit()
+                ])
                 padded = clean_5t.ljust(5, '\xFF')
                 for i in range(5):
                     char = padded[i]
-                    self._memobj.fivetone_id[i] = int(char) if char != '\xFF' else 0xFF
-                    
+                    if char != '\xFF':
+                        self._memobj.fivetone_id[i] = int(char)
+                    else:
+                        self._memobj.fivetone_id[i] = 0xFF
+
             elif setting == "biis_id":
                 val = int(value)
                 self._mmap[0x9c80] = (val >> 8) & 0xFF
                 self._mmap[0x9c81] = val & 0xFF
-                
+
             elif setting == "pf1_short":
                 self._memobj.prog_key.pf1_short = int(value)
             elif setting == "pf2_short":
@@ -998,7 +1198,7 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                 self._memobj.prog_key.pf1_long = int(value)
             elif setting == "pf2_long":
                 self._memobj.prog_key.pf2_long = int(value)
-                
+
             elif setting == "scan_mode":
                 self._memobj.scan_menu.scan_mode = int(value)
             elif setting == "scan_memory":
@@ -1007,6 +1207,6 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
             elif setting.startswith("zone_name_"):
                 idx = int(setting.split("_")[-1])
                 name_bytes = str(value).encode('ascii', 'replace')
-                name_bytes = name_bytes.ljust(16, b'\xff')[:16]
+                name_bytes = name_bytes.ljust(16, b'\x00')[:16]
                 for i in range(16):
                     self._memobj.zones[idx].name[i] = name_bytes[i]
