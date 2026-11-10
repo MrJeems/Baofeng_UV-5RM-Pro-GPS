@@ -1,3 +1,23 @@
+# Copyright 2026 MrJeems <dev@mrjeems.com> (UV-5RM PRO radio offsets, decoding, and testing)
+# Copyright 2025 Mike Iacovacci <ascendr@linuxmail.org> (Original UV-5RM Pro Base)
+# Copyright 2026 Dan <dannjb@gmail.com> (Reference for LMR Zone architecture)
+# Copyright 2023 Sander van der Wel (Reference for UV17Pro memory map)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""Baofeng UV-5RM PRO GPS radio management module"""
+
 import struct
 import logging
 import time
@@ -14,21 +34,31 @@ from chirp.settings import (
 
 LOG = logging.getLogger(__name__)
 
-# Standard Baofeng Memory-Mapped Protocol Key
+# --- GLOBAL CHIRP INJECTIONS FOR CSV EXPORT ---
+_temp_tones = list(chirp_common.TONES)
+for _tone in [63.0, 202.0]:
+    if _tone not in _temp_tones:
+        _temp_tones.append(_tone)
+_temp_tones.sort()
+chirp_common.TONES = tuple(_temp_tones)
+
+_temp_dtcs = list(chirp_common.DTCS_CODES)
+if 17 not in _temp_dtcs:
+    _temp_dtcs.append(17)
+    _temp_dtcs.sort()
+chirp_common.DTCS_CODES = tuple(_temp_dtcs)
+
 XOR_KEY = 0x1D
 
 def _xor(data):
-    """XORs a byte string with the standard radio key."""
     return bytes([x ^ XOR_KEY for x in data])
 
 def _clean_read(serial_obj, size):
-    """Helper to ensure we read the exact number of bytes requested."""
     data = serial_obj.read(size)
     if len(data) != size:
         raise errors.RadioError(f"Timeout waiting for data. Expected {size} bytes, got {len(data)}")
     return data
 
-# --- UV-5RM Pro GPS Value Lists ---
 VOX_LIST = ["OFF"] + [f"Level {i}" for i in range(1, 10)]
 VOICE_LIST = ["OFF", "Chinese", "English"]
 ROGER_LIST = ["OFF", "ROGER 1", "ROGER 2", "ROGER 3"]
@@ -51,7 +81,7 @@ PROG_KEY_MAP = [
     ("Zone", 0x0C), ("Battery Display", 0x0D), ("Power", 0x0E), ("Vox", 0x0F)
 ]
 
-# --- Verified Hex Memory Map ---
+# --- FULLY VERIFIED OEM MEMORY MAP ---
 MEM_FORMAT = """
 # seekto 0x0000;
 u8 radio_name_0000[16];
@@ -133,17 +163,26 @@ u8 power_on_pwd[8];
 # seekto 0x7a20;
 struct{
     lbit      bitfield[640];
-} chan_empty;
+} chan_valid;
 
-# seekto 0x7b18;
+# seekto 0x7A80;
+u8 zones_used;
+
+# seekto 0x7A90;
 struct {
-    char    name[16];
-    u16     channel_count;
-    u16     channels[64];
-    u8      pad[6];
+  u8 count;
+  u8 unknown0;
+  u16 channels[64];
+  u8 unknown1[6];
+  char name[16];
 } zones[10];
 
-# seekto 0x8180;
+# seekto 0x80a0;
+struct{
+    lbit      bitfield[640];
+} scan_skip;
+
+# seekto 0x81b0;
 struct{
     u8      scan_mode;
     u8      flyback;
@@ -157,11 +196,6 @@ struct{
     u8      unk_0x8189[2];
     u8      scan_memory;
 } scan_menu;
-
-# seekto 0x81a0;
-struct{
-    lbit      bitfield[640];
-} scan_skip;
 
 # seekto 0x8200;
 struct{
@@ -201,7 +235,7 @@ u8 fivetone_id[5];
 u8 st_5tone;
 
 # seekto 0x9c80;
-u16 biis_id;
+u8 biis_id[2];
 
 # seekto 0x9c88;
 u8 st_bdc1200;
@@ -219,15 +253,16 @@ def raw_send(serial, data, exlen):
     serial.write(data)
     return serial.read(exlen)
 
-
 def wakeup(serial, xor):
     header_sync = b'PROGRAM' + bytes([xor])
+    LOG.debug("HANDSHAKE1: Sending T_Info (16 bytes)")
     serial.write(T_INFO)
     time.sleep(0.5)
     serial.timeout = 2.0
     resp = serial.read(16)
 
     if len(resp) >= 1 and resp[0] == 0x41:
+        LOG.debug("HANDSHAKE2: Got 0x41 at %d baud, sending PROGRAM+seed", serial.baudrate)
         serial.write(header_sync)
         return
 
@@ -246,14 +281,12 @@ def wakeup(serial, xor):
         LOG.error(err)
         raise errors.RadioError(err)
 
-
 def exit_prog(serial, xor):
     ba = [b ^ xor for b in b'END\x00']
     try:
-        raw_send(serial, bytes(ba), 1)
+        resp = raw_send(serial, bytes(ba), 1)
     except Exception as e:
         LOG.warning(f"Exit prog error: {e}")
-
 
 def do_init(serial, xor):
     resp = raw_send(serial, b'', 1)
@@ -275,7 +308,6 @@ def do_init(serial, xor):
     if len(resp) < 1 or (resp[0] ^ xor) != 0x41:
         raise errors.RadioError(f"Init HANDSHAKE6 expected 0x41 got {resp!r}")
 
-
 def read_block(serial, xor, addr, blk_len):
     i_cmd = (0x52000000 + addr) ^ (0x01010101 * xor)
     cmd = struct.pack('>L', i_cmd)
@@ -285,7 +317,6 @@ def read_block(serial, xor, addr, blk_len):
         raise errors.RadioError("Read block echo failed")
     return resp[4:]
 
-
 def write_block(serial, xor, addr, data, blk_len):
     i_cmd = (0x57000000 + addr) ^ (0x01010101 * xor)
     cmd = struct.pack('>L', i_cmd)
@@ -293,7 +324,6 @@ def write_block(serial, xor, addr, data, blk_len):
     if len(resp) < 1 or (resp[0] ^ xor) != 0x41:
         raise errors.RadioError(f"Write block ack failed expect 0x41 got {resp[0] if resp else 'empty'}")
     return blk_len
-
 
 def do_download(radio):
     data = b''
@@ -322,9 +352,7 @@ def do_download(radio):
         raise errors.RadioError(f"Error during download: {e}")
     finally:
         exit_prog(serial, xor)
-
     return memmap.MemoryMapBytes(data)
-
 
 def do_upload(radio):
     try:
@@ -341,24 +369,28 @@ def do_upload(radio):
 
         wakeup(serial, xor)
         do_init(serial, xor)
-
+        
+        SAFE_BLOCKS = ADDRS
         status.max = len(ADDRS) * BLK_SZ
         status.msg = "Uploading..."
+        
         for i, addr in enumerate(ADDRS):
             si = BLK_SZ * i
             ei = BLK_SZ * (i + 1)
             data = radio._mmap[si:ei]
+            
+            LOG.info("Writing block at 0x%06X (4096 bytes)...", addr)
             enc_data = bytes([b ^ xor for b in data])
             resp = write_block(serial, xor, addr, enc_data, BLK_SZ)
             status.cur += resp
             radio.status_fn(status)
+
     except errors.RadioError:
         raise
     except Exception as e:
         raise errors.RadioError(f"Error during upload: {e}")
     finally:
         exit_prog(serial, xor)
-
 
 @directory.register
 class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
@@ -367,9 +399,7 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
     MODEL = "UV-5RM Pro GPS"
     BAUD_RATE = 19200
     
-    _memsize = 0x10000
-    
-    POWER_LEVELS = [chirp_common.PowerLevel("Low", watts=2.00),
+    POWER_LEVELS = [chirp_common.PowerLevel("Low",  watts=2.00),
                     chirp_common.PowerLevel("Medium", watts=5.00),
                     chirp_common.PowerLevel("High", watts=10.00)]
                     
@@ -382,7 +412,7 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
     def get_features(self):
         rf = chirp_common.RadioFeatures()
         rf.has_settings = True
-        rf.has_bank = False
+        rf.has_bank = False 
         rf.has_tuning_step = False
         rf.has_name = True
         rf.valid_characters = self.VALID_CHARSET
@@ -409,12 +439,6 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         rf.memory_bounds = (1, 640)
         return rf
 
-    @classmethod
-    def get_prompts(cls):
-        p = chirp_common.RadioPrompts()
-        p.has_bank = False
-        return p
-
     def process_mmap(self):
         self._memobj = bitwise.parse(MEM_FORMAT, self._mmap)
 
@@ -426,7 +450,33 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         self._mmap = data
         self.process_mmap()
 
+    # CRITICAL: The UV-5RM Pro GPS uses strict 64-channel physical memory partitions for Zones.
+    # It does NOT use dynamic linked lists for channel assignment. 
+    # Zone 1 strictly owns global channels 1-64. Zone 2 owns 65-128, etc.
+    # The array requires 1-based indexing, Big-Endian formatting (u16), and 0x0000 padding.
     def sync_out(self):
+        zones_used = 0
+        for z in range(10):
+            z_obj = self._memobj.zones[z]
+            count = 0
+            
+            # Map up to 64 consecutive memory channels to each respective Zone
+            for idx in range(64):
+                global_ch = (z * 64) + idx
+                if not self.get_empty(global_ch):
+                    z_obj.channels[idx] = global_ch 
+                    count += 1
+                else:
+                    z_obj.channels[idx] = 0xFFFF
+            
+            z_obj.count = count
+            z_obj.unknown0 = 0xFF
+            
+            if count > 0:
+                zones_used += 1
+
+        self._memobj.zones_used = zones_used
+
         try:
             do_upload(self)
         except Exception as e:
@@ -497,41 +547,42 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
 
         if mem.empty:
             self.set_empty(mem.number - 1, 1)
-            _mem.fill_raw(b'\x00')
+            _mem.set_raw(b'\xff' * 48)
             return
-
-        _mem.rx_freq = mem.freq // 10
 
         if self.get_empty(mem.number - 1):
             self.set_empty(mem.number - 1, 0)
-            mem.duplex == ''
-            _mem.tx_freq.set_value(int(_mem.rx_freq))
-            _mem.power = 2
+            _mem.set_raw(b'\x00' * 48) 
+            mem.duplex = ''
+
+        _mem.rx_freq = mem.freq // 10
 
         try:
             _mem.power = self.POWER_LEVELS.index(mem.power)
         except ValueError:
             _mem.power = 2
 
-        padded_name = mem.name.ljust(16)
+        name_bytes = (mem.name or "").encode('ascii', 'replace')
+        name_bytes = name_bytes.ljust(16, b'\xff')[:16]
         for i in range(16):
-            char_val = ord(padded_name[i])
-            if char_val > 127: char_val = 32 
-            _mem.name[i] = char_val
+            _mem.name[i] = name_bytes[i]
 
         _skip = 1 if mem.skip == 'S' else 0
         self.set_skip(mem.number - 1, _skip)
         _mem.bandwidth = self.VALID_MODES.index(mem.mode)
+        
+        # Enforce OEM CPS default padding block logic
+        for i in range(5):
+            _mem.unk_0x14_18[i] = 0x05
+            
         self.set_tone(_mem, mem)
 
         if mem.duplex == '+':
             _mem.tx_freq = (mem.freq + mem.offset) // 10
         elif mem.duplex == '-':
             _mem.tx_freq = (mem.freq - mem.offset) // 10
-        elif mem.duplex == '':
+        elif mem.duplex == '' or mem.duplex == 'off':
             _mem.tx_freq.set_value(int(_mem.rx_freq))
-        elif mem.duplex == 'off':
-            _mem.tx_freq.set_value(0)
 
         for setting in mem.extra:
             val = setting.value
@@ -568,9 +619,9 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         ((txmode, txval, txpol),
          (rxmode, rxval, rxpol)) = chirp_common.split_tone_encode(mem)
         if txmode == "":
-            _mem.tx_tone.set_raw(b'\xff\xff')
+            _mem.tx_tone.set_raw(b'\x00\x00')
         if rxmode == "":
-            _mem.rx_tone.set_raw(b'\xff\xff')
+            _mem.rx_tone.set_raw(b'\x00\x00')
         if txmode == "Tone":
             _mem.tx_tone = int(txval * 10)
         if rxmode == "Tone":
@@ -584,21 +635,25 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
             lsb = int("%02i" % (txval % 100), 16)
             _mem.tx_tone.set_raw(bytes([msb, lsb]))
         if rxmode == "DTCS" and rxpol == "R":
-            msb = (txval // 100) + 0xc0
-            lsb = int("%02i" % (txval % 100), 16)
+            msb = (rxval // 100) + 0xc0
+            lsb = int("%02i" % (rxval % 100), 16)
             _mem.rx_tone.set_raw(bytes([msb, lsb]))
 
     def get_skip(self, chan_n):
-        return self._memobj.scan_skip['bitfield'][chan_n].get_value()
+        val = self._memobj.scan_skip['bitfield'][chan_n].get_value()
+        return bool(val)
 
     def set_skip(self, chan_n, value):
-        self._memobj.scan_skip['bitfield'][chan_n].set_value(value)
+        val = 1 if value else 0
+        self._memobj.scan_skip['bitfield'][chan_n].set_value(val)
 
     def get_empty(self, chan_n):
-        return self._memobj.chan_empty['bitfield'][chan_n].get_value()
+        val = self._memobj.chan_valid['bitfield'][chan_n].get_value()
+        return bool(val)
 
     def set_empty(self, chan_n, value):
-        self._memobj.chan_empty['bitfield'][chan_n].set_value(value)
+        val = 1 if value else 0
+        self._memobj.chan_valid['bitfield'][chan_n].set_value(val)
 
     def get_settings(self):
         top = RadioSettingGroup("top", "UV-5RM Pro GPS Settings")
@@ -612,10 +667,13 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         scan = RadioSettingGroup("scan", "Scan Settings")
 
         raw_name = bytes(self._memobj.radio_name_0000)
-        end_idx = raw_name.find(b'\xff')
-        if end_idx != -1:
-            raw_name = raw_name[:end_idx]
-        name_str = "".join([chr(b) for b in raw_name if 32 <= b < 127])
+        name_chars = []
+        for b in raw_name:
+            if b in (0x00, 0xFF):
+                break
+            if 32 <= b < 127:
+                name_chars.append(chr(b))
+        name_str = "".join(name_chars).strip()
         rs_name = RadioSetting("radio_name", "Radio Name", RadioSettingValueString(0, 16, name_str))
         rs_name.value.set_charset(self.VALID_CHARSET)
         basic.append(rs_name)
@@ -713,7 +771,7 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         raw_pwd = self._memobj.power_on_pwd
         pwd_str = "".join([chr(int(b)) for b in raw_pwd if 0x30 <= int(b) <= 0x39])
         rs_pwd = RadioSetting("password", "Power-on Password", RadioSettingValueString(0, 8, pwd_str))
-        rs_pwd.value.set_charset("0123456789")
+        rs_pwd.value.set_charset("0123456789 ")
         basic.append(rs_pwd)
 
         sidetone.append(RadioSetting("st_dtmf", "DTMF Sidetone", RadioSettingValueBoolean(bool(int(self._memobj.dtmf.dtmf_st)))))
@@ -723,17 +781,20 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         
         dtmf_str = "".join([str(int(b)) for b in self._memobj.dtmf.self_id if 0 <= int(b) <= 9])
         rs_dtmf = RadioSetting("dtmf_id", "DTMF ID", RadioSettingValueString(0, 3, dtmf_str))
-        rs_dtmf.value.set_charset("0123456789")
+        rs_dtmf.value.set_charset("0123456789 ")
         ident.append(rs_dtmf)
 
         fivetone_str = "".join([str(int(b)) for b in self._memobj.fivetone_id if 0 <= int(b) <= 9])
         rs_5t = RadioSetting("fivetone_id", "5Tone ID", RadioSettingValueString(0, 5, fivetone_str))
-        rs_5t.value.set_charset("0123456789")
+        rs_5t.value.set_charset("0123456789 ")
         ident.append(rs_5t)
         
-        biis_val = int(self._memobj.biis_id)
-        if biis_val > 65535: biis_val = 0
-        ident.append(RadioSetting("biis_id", "BIIS ID", RadioSettingValueInteger(0, 65535, biis_val)))
+        raw_biis = self._mmap[0x9c80:0x9c82]
+        biis_val = (raw_biis[0] << 8) | raw_biis[1] 
+        
+        label = "BIIS ID"
+        if biis_val > 9999: biis_val = 0
+        ident.append(RadioSetting("biis_id", label, RadioSettingValueInteger(0, 9999, biis_val)))
 
         val_pf1_s = int(self._memobj.prog_key.pf1_short)
         if val_pf1_s not in [v for k, v in PROG_KEY_MAP]: val_pf1_s = 0
@@ -751,16 +812,16 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
         if val_pf2_l not in [v for k, v in PROG_KEY_MAP]: val_pf2_l = 0
         keys.append(RadioSetting("pf2_long", "SK2 (PF2) Long Press", RadioSettingValueMap(PROG_KEY_MAP, val_pf2_l)))
 
-        # --- Map Zones into Settings ---
         for i in range(10):
             _zone = self._memobj.zones[i]
-            raw_zname = []
+            name_chars = []
             for char in _zone.name:
                 val = int(char)
                 if val == 0x00 or val == 0xFF:
                     break
-                raw_zname.append(val)
-            zname_str = bytes(raw_zname).decode('ascii', 'ignore').strip()
+                if 32 <= val < 127:
+                    name_chars.append(chr(val))
+            zname_str = "".join(name_chars).strip()
             rs_zname = RadioSetting(f"zone_name_{i}", f"Zone {i+1} Name", RadioSettingValueString(0, 16, zname_str))
             rs_zname.value.set_charset(self.VALID_CHARSET)
             zones.append(rs_zname)
@@ -792,10 +853,14 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                 
             setting = element.get_name()
             value = element.value
-            
+
+            # The radio OS parses the Radio Name as a standard C-string. 
+            # It MUST be padded with Null bytes (\x00), NOT \xFF. 
+            # Padding with \xFF causes the radio UI to render literal blank spaces on the screen.
             if setting == "radio_name":
-                name_bytes = str(value).encode('ascii', 'replace')
-                name_bytes = name_bytes.ljust(16, b'\xff')[:16]
+                clean_name = str(value.get_value()).strip() if hasattr(value, 'get_value') else str(value).strip()
+                name_bytes = clean_name.encode('ascii', 'replace')
+                name_bytes = name_bytes.ljust(16, b'\x00')[:16]
                 for i in range(16):
                     self._memobj.radio_name_0000[i] = name_bytes[i]
 
@@ -919,8 +984,11 @@ class BaofengUV5RMProGPS(chirp_common.CloneModeRadio):
                 for i in range(5):
                     char = padded[i]
                     self._memobj.fivetone_id[i] = int(char) if char != '\xFF' else 0xFF
+                    
             elif setting == "biis_id":
-                self._memobj.biis_id = int(value)
+                val = int(value)
+                self._mmap[0x9c80] = (val >> 8) & 0xFF
+                self._mmap[0x9c81] = val & 0xFF
                 
             elif setting == "pf1_short":
                 self._memobj.prog_key.pf1_short = int(value)
